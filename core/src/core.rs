@@ -235,7 +235,7 @@ impl ToString for PreloaderType {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Symbol {
     Bitmap(Bitmap),
     MovieClip(MovieClip),
@@ -280,7 +280,8 @@ impl Symbol {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+/// Note: cloning the bitmap will reset the cache.
 pub struct Bitmap {
     pub properties: BitmapProperties,
     #[serde(skip)]
@@ -335,6 +336,14 @@ impl Bitmap {
         }
     }
 }
+impl Clone for Bitmap {
+    fn clone(&self) -> Self {
+        Self {
+            properties: self.properties.clone(),
+            cache: BitmapCacheStatus::Uncached,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct BitmapProperties {
@@ -368,6 +377,15 @@ pub enum BitmapCacheStatus {
     Cached(CachedBitmap),
     Invalid(String),
 }
+impl std::fmt::Debug for BitmapCacheStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Uncached => write!(f, "Uncached"),
+            Self::Cached(_) => f.debug_tuple("Cached").finish(),
+            Self::Invalid(error) => f.debug_tuple("Invalid").field(error).finish(),
+        }
+    }
+}
 pub struct CachedBitmap {
     pub image: DynamicImage,
     pub bitmap_handle: Option<Box<dyn BitmapHandle>>,
@@ -376,7 +394,7 @@ pub trait BitmapHandle {
     fn as_any(&self) -> &dyn Any;
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MovieClip {
     pub properties: MovieClipProperties,
     pub place_symbols: Vec<PlaceSymbol>,

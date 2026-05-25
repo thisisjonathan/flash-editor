@@ -1,6 +1,6 @@
 use flits_core::{
     BitmapProperties, EditorColor, FlitsFont, MovieClipProperties, MovieProperties, PlaceSymbol,
-    PreloaderType, TextAlign,
+    PreloaderType, SymbolIndexOrRoot, TextAlign,
 };
 
 use crate::{
@@ -9,8 +9,6 @@ use crate::{
     message::EditorMessage,
     undo::EditMessage,
 };
-
-// TODO: high cpu usage when cursor is in field
 
 #[derive(Default)]
 pub struct PropertiesPanel2 {}
@@ -22,6 +20,7 @@ impl PropertiesPanel2 {
                     ui,
                     ctx,
                     ctx.movie.properties.clone(),
+                    ctx.selection.properties_symbol_index,
                     |model| EditMessage::Change(MovieChange::MovieProperties(model)),
                     (),
                 ),
@@ -31,6 +30,7 @@ impl PropertiesPanel2 {
                             ui,
                             ctx,
                             bitmap.properties.clone(),
+                            ctx.selection.properties_symbol_index,
                             |model| {
                                 EditMessage::Change(MovieChange::BitmapProperties(
                                     properties_symbol_index,
@@ -50,6 +50,7 @@ impl PropertiesPanel2 {
                             ui,
                             ctx,
                             movie_clip.properties.clone(),
+                            ctx.selection.properties_symbol_index,
                             |model| {
                                 EditMessage::Change(MovieChange::MovieClipProperties(
                                     properties_symbol_index,
@@ -62,6 +63,7 @@ impl PropertiesPanel2 {
                             ui,
                             ctx,
                             flits_font.clone(),
+                            ctx.selection.properties_symbol_index,
                             |model| {
                                 EditMessage::Change(MovieChange::FontProperties(
                                     properties_symbol_index,
@@ -80,6 +82,7 @@ impl PropertiesPanel2 {
                     .get_placed_symbols(ctx.selection.properties_symbol_index)
                     [ctx.selection.placed_symbols[0]]
                     .clone(),
+                None,
                 |model| {
                     EditMessage::Change(MovieChange::PlacedSymbols(vec![PlacedSymbolChange {
                         editing_symbol_index: ctx.selection.properties_symbol_index,
@@ -100,10 +103,23 @@ impl PropertiesPanel2 {
         ui: &mut egui::Ui,
         ctx: &Context,
         model: T,
+        symbol_index: SymbolIndexOrRoot,
         edit_message: impl FnOnce(T) -> EditMessage<MovieChange, MovieAction>,
         additional_info: I,
     ) {
-        ui.heading(&model.name());
+        ui.horizontal(|ui| {
+            ui.heading(&model.name());
+            if model.has_context_menu() {
+                ui.with_layout(
+                    egui::Layout::default().with_cross_align(egui::Align::RIGHT),
+                    |ui| {
+                        egui::menu::menu_button(ui, "...", |ui| {
+                            model.context_menu(symbol_index, ui, ctx);
+                        });
+                    },
+                );
+            }
+        });
 
         let blocks = model.property_blocks(additional_info);
 
@@ -212,8 +228,6 @@ impl<T> Block<T> {
             ui.heading(heading);
         }
 
-        // TODO: button to remove symbol
-
         struct PropertyContext<T> {
             model_clone: T,
             commit_needed: bool,
@@ -266,6 +280,21 @@ impl<T> Block<T> {
 trait PanelType<I> {
     fn name(&self) -> String;
     fn property_blocks(&self, additional_info: I) -> Vec<Block<Self>>;
+    fn has_context_menu(&self) -> bool {
+        false
+    }
+    fn context_menu(&self, symbol_index: SymbolIndexOrRoot, ui: &mut egui::Ui, ctx: &Context) {}
+}
+fn symbol_context_menu(symbol_index: SymbolIndexOrRoot, ui: &mut egui::Ui, ctx: &Context) {
+    let Some(symbol_index) = symbol_index else {
+        panic!("Context menu doesn't work for root");
+    };
+    if ui.button("Delete").clicked() {
+        ctx.message_bus
+            .publish(EditorMessage::NewEdit(EditMessage::Action(
+                MovieAction::remove_movieclip(ctx.movie, symbol_index),
+            )));
+    }
 }
 
 impl PanelType<()> for MovieProperties {
@@ -329,6 +358,13 @@ impl PanelType<BitmapPropertiesAdditionalInfo> for BitmapProperties {
             .with_condition(|model| model.animation.is_some()),
         ]
     }
+
+    fn has_context_menu(&self) -> bool {
+        true
+    }
+    fn context_menu(&self, symbol_index: SymbolIndexOrRoot, ui: &mut egui::Ui, ctx: &Context) {
+        symbol_context_menu(symbol_index, ui, ctx);
+    }
 }
 
 impl PanelType<()> for MovieClipProperties {
@@ -341,6 +377,13 @@ impl PanelType<()> for MovieClipProperties {
             property!("Name", model, model.name),
             property!("Class", model, model.class_name),
         ])]
+    }
+
+    fn has_context_menu(&self) -> bool {
+        true
+    }
+    fn context_menu(&self, symbol_index: SymbolIndexOrRoot, ui: &mut egui::Ui, ctx: &Context) {
+        symbol_context_menu(symbol_index, ui, ctx);
     }
 }
 
@@ -360,6 +403,13 @@ impl PanelType<()> for FlitsFont {
                 model.characters.additional_characters
             ),
         ])]
+    }
+
+    fn has_context_menu(&self) -> bool {
+        true
+    }
+    fn context_menu(&self, symbol_index: SymbolIndexOrRoot, ui: &mut egui::Ui, ctx: &Context) {
+        symbol_context_menu(symbol_index, ui, ctx);
     }
 }
 

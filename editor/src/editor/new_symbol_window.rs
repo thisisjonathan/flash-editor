@@ -1,6 +1,6 @@
 use egui::Vec2;
 
-use crate::edits::MovieAction;
+use crate::{editor::Context, edits::MovieAction};
 
 #[derive(Default)]
 pub struct NewSymbolWindow {
@@ -8,7 +8,7 @@ pub struct NewSymbolWindow {
     has_requestion_focus: bool,
 }
 impl NewSymbolWindow {
-    pub fn do_ui(&mut self, egui_ctx: &egui::Context) -> NewSymbolWindowResult {
+    pub fn do_ui(&mut self, egui_ctx: &egui::Context, ctx: &Context) -> NewSymbolWindowResult {
         let mut result = NewSymbolWindowResult::NoAction;
         let mut is_window_open = true;
         // title says new movieclip because there are no other options yet
@@ -40,7 +40,8 @@ impl NewSymbolWindow {
                         .clicked()
                         || (user_confirmed_form && !self.name.is_empty())
                     {
-                        result = NewSymbolWindowResult::Confirm(MovieAction::AddMovieClip(
+                        result = NewSymbolWindowResult::Confirm(MovieAction::add_movieclip(
+                            ctx.movie,
                             self.name.clone(),
                         ));
                     }
