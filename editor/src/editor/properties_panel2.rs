@@ -283,7 +283,7 @@ trait PanelType<I> {
     fn has_context_menu(&self) -> bool {
         false
     }
-    fn context_menu(&self, symbol_index: SymbolIndexOrRoot, ui: &mut egui::Ui, ctx: &Context) {}
+    fn context_menu(&self, _symbol_index: SymbolIndexOrRoot, _ui: &mut egui::Ui, _ctx: &Context) {}
 }
 fn symbol_context_menu(symbol_index: SymbolIndexOrRoot, ui: &mut egui::Ui, ctx: &Context) {
     let Some(symbol_index) = symbol_index else {
