@@ -294,6 +294,7 @@ fn symbol_context_menu(symbol_index: SymbolIndexOrRoot, ui: &mut egui::Ui, ctx: 
             .publish(EditorMessage::NewEdit(EditMessage::Action(
                 MovieAction::remove_movieclip(ctx.movie, symbol_index),
             )));
+        ui.close_menu();
     }
 }
 
