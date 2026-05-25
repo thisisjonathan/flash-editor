@@ -122,13 +122,15 @@ impl PropertiesPanel2 {
         });
 
         let blocks = model.property_blocks(additional_info);
+        let panel_name = model.name();
 
         let mut model_clone = model;
         let mut commit_needed = false;
         let mut propery_changed = false;
 
         for (block_index, block) in blocks.iter().enumerate() {
-            let (needs_change, needs_commit) = block.do_ui(ui, &mut model_clone, block_index);
+            let (needs_change, needs_commit) =
+                block.do_ui(ui, &mut model_clone, block_index, &panel_name);
             if needs_change {
                 propery_changed = true;
             }
@@ -223,7 +225,14 @@ impl<T> Block<T> {
             error: None,
         }
     }
-    fn do_ui(&self, ui: &mut egui::Ui, model: &mut T, index: usize) -> (bool, bool) {
+    fn do_ui(
+        &self,
+        ui: &mut egui::Ui,
+        model: &mut T,
+        index: usize,
+        // to let egui differentiate different panels
+        panel_heading: &str,
+    ) -> (bool, bool) {
         if let Some(condition) = self.condition {
             if !condition(model) {
                 return (false, false);
@@ -267,9 +276,11 @@ impl<T> Block<T> {
         } else {
             // TODO: change amount of rows based on available width
             match self.grid_direction {
-                GridDirectorion::Horizontal => grid_layout(ui, &mut context, iterator, index),
+                GridDirectorion::Horizontal => {
+                    grid_layout(ui, &mut context, iterator, index, &panel_heading)
+                }
                 GridDirectorion::Vertical => {
-                    vertical_grid_layout(ui, &mut context, iterator, index)
+                    vertical_grid_layout(ui, &mut context, iterator, index, &panel_heading)
                 }
             }
         }
@@ -494,8 +505,14 @@ fn grid_layout<T>(
     context: &mut T,
     iterator: impl ExactSizeIterator<Item = impl FnOnce(&mut egui::Ui, &mut T)>,
     index: usize,
+    heading: &str,
 ) {
-    egui::Grid::new(format!("properties_horizontal_grid_layout_{}", index)).show(ui, |ui| {
+    egui::Grid::new(format!(
+        "{}_properties_horizontal_grid_layout_{}",
+        heading, index
+    ))
+    .min_col_width(10.0)
+    .show(ui, |ui| {
         let length = iterator.len();
         for (index, callback) in iterator.enumerate() {
             (callback)(ui, context);
@@ -511,15 +528,21 @@ fn vertical_grid_layout<T>(
     context: &mut T,
     iterator: impl ExactSizeIterator<Item = impl FnOnce(&mut egui::Ui, &mut T)>,
     index: usize,
+    panel_type: &str,
 ) {
     let mut iterator = iterator.peekable();
-    egui::Grid::new(format!("properties_vertical_grid_layout_{}", index)).show(ui, |ui| {
+    egui::Grid::new(format!(
+        "{}_properties_vertical_grid_layout_{}",
+        panel_type, index
+    ))
+    .show(ui, |ui| {
         let mut column_index = 0;
         loop {
             egui::Grid::new(format!(
-                "properties_vertical_grid_layout_{}_inner_{}",
-                index, column_index
+                "{}_properties_vertical_grid_layout_{}_inner_{}",
+                panel_type, index, column_index
             ))
+            .min_col_width(10.0)
             .show(ui, |ui| {
                 for _ in 0..2 {
                     if let Some(callback) = iterator.next() {
