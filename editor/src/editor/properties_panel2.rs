@@ -249,8 +249,14 @@ impl<T> Block<T> {
                 }
             }
         });
+
         // TODO: more accurate width estimate
-        if ui.available_width() > (self.properties.len() * 140) as f32 {
+        let padding = 10.0;
+        let properties_width = self
+            .properties
+            .iter()
+            .fold(0.0, |acc, p| acc + p.width() + padding);
+        if ui.available_width() > properties_width {
             horizontal_layout(ui, &mut context, iterator);
         } else {
             // TODO: change amount of rows based on available width
@@ -538,9 +544,23 @@ impl<Model, ValueType, Settings> Property<Model, ValueType, Settings> {
         Box::new(self)
     }
 }
+impl<Model, ValueType, Settings> LabelWidth for Property<Model, ValueType, Settings> {
+    fn label_width(&self) -> f32 {
+        self.name.len() as f32 * 7.3
+    }
+}
 
-trait PropertyTrait<Model> {
+trait LabelWidth {
+    fn label_width(&self) -> f32;
+}
+trait PropertyTrait<Model>: LabelWidth {
     fn do_ui(&self, ui: &mut egui::Ui, model: &mut Model) -> (bool, bool);
+    fn width(&self) -> f32 {
+        self.label_width() + self.control_width()
+    }
+    fn control_width(&self) -> f32 {
+        50.0
+    }
 }
 
 struct NumericPropertySettings<T> {
@@ -604,6 +624,9 @@ impl<Model> PropertyTrait<Model> for Property<Model, String, StringPropertySetti
         }
         (response.changed(), response.lost_focus())
     }
+    fn control_width(&self) -> f32 {
+        300.0
+    }
 }
 
 impl<Model> PropertyTrait<Model> for Property<Model, bool> {
@@ -614,6 +637,9 @@ impl<Model> PropertyTrait<Model> for Property<Model, bool> {
             (self.set)(model, value);
         }
         (response.changed(), response.changed())
+    }
+    fn control_width(&self) -> f32 {
+        20.0
     }
 }
 
@@ -658,6 +684,9 @@ where
             (self.set)(model, value);
         }
         (changed, changed)
+    }
+    fn control_width(&self) -> f32 {
+        100.0
     }
 }
 
