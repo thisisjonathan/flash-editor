@@ -200,9 +200,14 @@ macro_rules! property_option {
 }
 
 type PropertyBox<T> = Box<dyn PropertyTrait<T>>;
+enum GridDirectorion {
+    Horizontal,
+    Vertical,
+}
 struct Block<T: ?Sized> {
     properties: Vec<PropertyBox<T>>,
     heading: Option<String>,
+    grid_direction: GridDirectorion,
     // the condition needs to be evaluated when showing the ui because
     // it might change depending on an earlier property.
     condition: Option<fn(model: &T) -> bool>,
@@ -213,6 +218,7 @@ impl<T> Block<T> {
         Self {
             properties,
             heading: None,
+            grid_direction: GridDirectorion::Horizontal,
             condition: None,
             error: None,
         }
@@ -260,7 +266,12 @@ impl<T> Block<T> {
             horizontal_layout(ui, &mut context, iterator);
         } else {
             // TODO: change amount of rows based on available width
-            vertical_grid_layout(ui, &mut context, iterator, index);
+            match self.grid_direction {
+                GridDirectorion::Horizontal => grid_layout(ui, &mut context, iterator, index),
+                GridDirectorion::Vertical => {
+                    vertical_grid_layout(ui, &mut context, iterator, index)
+                }
+            }
         }
 
         if let Some(error) = &self.error {
@@ -271,6 +282,10 @@ impl<T> Block<T> {
     }
     fn with_heading(mut self, heading: String) -> Self {
         self.heading = Some(heading);
+        self
+    }
+    fn with_vertial_direction(mut self) -> Self {
+        self.grid_direction = GridDirectorion::Vertical;
         self
     }
     fn with_condition(mut self, condition: fn(model: &T) -> bool) -> Self {
@@ -317,7 +332,8 @@ impl PanelType<()> for MovieProperties {
             // if i remember correctly, the spec specifies this as rgb. the alpha is ignored (TODO: check)
             property!("Background color", model, model.background_color),
             property!("Preloader", model, model.preloader),
-        ])]
+        ])
+        .with_vertial_direction()]
     }
 }
 
@@ -354,14 +370,16 @@ impl PanelType<BitmapPropertiesAdditionalInfo> for BitmapProperties {
                     inner_model,
                     inner_model.frame_delay
                 ),
-                property_option!(
-                    "On last frame call (e.g. 'stop' or 'removeMovieClip')",
-                    model,
-                    model.animation,
-                    inner_model,
-                    inner_model.end_action
-                ),
             ])
+            .with_condition(|model| model.animation.is_some()),
+            // separate block because the label is long and lining the other items up to that looks bad
+            Block::new(vec![property_option!(
+                "On last frame call (e.g. 'stop' or 'removeMovieClip')",
+                model,
+                model.animation,
+                inner_model,
+                inner_model.end_action
+            )])
             .with_condition(|model| model.animation.is_some()),
         ]
     }
@@ -432,7 +450,8 @@ impl PanelType<()> for PlaceSymbol {
             property!("X scale", model, model.transform.x_scale),
             property!("Y scale", model, model.transform.y_scale),
             property!("Instance name", model, model.instance_name),
-        ])];
+        ])
+        .with_vertial_direction()];
         if self.text.is_some() {
             blocks.push(
                 Block::new(vec![
@@ -442,6 +461,7 @@ impl PanelType<()> for PlaceSymbol {
                     property_option!("Color", model, model.text, inner_model, inner_model.color),
                     property_option!("Align", model, model.text, inner_model, inner_model.align),
                 ])
+                .with_vertial_direction()
                 .with_heading("Text properties".into()),
             );
             blocks.push(Block::new(vec![
@@ -473,8 +493,9 @@ fn grid_layout<T>(
     ui: &mut egui::Ui,
     context: &mut T,
     iterator: impl ExactSizeIterator<Item = impl FnOnce(&mut egui::Ui, &mut T)>,
+    index: usize,
 ) {
-    egui::Grid::new("movie_properties_grid").show(ui, |ui| {
+    egui::Grid::new(format!("properties_horizontal_grid_layout_{}", index)).show(ui, |ui| {
         let length = iterator.len();
         for (index, callback) in iterator.enumerate() {
             (callback)(ui, context);
