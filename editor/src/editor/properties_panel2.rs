@@ -498,6 +498,23 @@ impl PanelType<()> for PlaceSymbol {
 
         blocks
     }
+
+    fn has_context_menu(&self) -> bool {
+        true
+    }
+    fn context_menu(&self, symbol_index: SymbolIndexOrRoot, ui: &mut egui::Ui, ctx: &Context) {
+        if ui.button("Delete").clicked() {
+            ctx.message_bus
+                .publish(EditorMessage::NewEdit(EditMessage::Action(
+                    MovieAction::remove_placed_symbol(
+                        ctx.movie,
+                        symbol_index,
+                        ctx.selection.placed_symbols[0],
+                    ),
+                )));
+            ui.close_menu();
+        }
+    }
 }
 
 fn grid_layout<T>(
@@ -620,6 +637,7 @@ macro_rules! impl_numeric_properties {
                     ui.label(format!("{}:", self.name));
                     let mut value = (self.get)(&model);
                     let mut drag_value = egui::DragValue::new(&mut value);
+                    // TODO: minimum width
 
                     if let Some(settings) = self.settings.as_ref() {
                         if let Some(minimum) = settings.minimum {

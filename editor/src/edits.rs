@@ -165,6 +165,18 @@ impl MovieAction {
             }
         }
     }
+
+    pub fn remove_placed_symbol(
+        movie: &Movie,
+        symbol_index: SymbolIndexOrRoot,
+        placed_symbol_index: PlacedSymbolIndex,
+    ) -> Self {
+        MovieAction::RemovePlacedSymbols(vec![PlacedSymbolAction {
+            editing_symbol_index: symbol_index,
+            placed_symbol: movie.get_placed_symbols(symbol_index)[placed_symbol_index].clone(),
+            placed_symbol_index,
+        }])
+    }
 }
 impl ActionEdit for MovieAction {
     type Model = Movie;
