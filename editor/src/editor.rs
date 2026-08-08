@@ -22,7 +22,7 @@ use crate::{
         run_ui::RunUi,
         stage::Stage,
     },
-    edits::{MovieAction, MovieChange, PlacedSymbolAction},
+    edits::{FlitsEditOutput, MovieAction, MovieChange, PlacedSymbolAction},
     message::EditorMessage,
     message_bus::MessageBus,
     undo::{EditMessage, UndoStack},
@@ -377,8 +377,23 @@ impl Editor {
                 self.stage.reset_text_renderer();
             }
             EditorMessage::NewEdit(edit_message) => {
-                self.undo_stack.update(&mut self.movie, edit_message);
-                // TODO: change view
+                let output = self.undo_stack.update(&mut self.movie, edit_message);
+                if let Some(output) = output {
+                    match output {
+                        FlitsEditOutput::Stage(editing_clip) => {
+                            // TODO: this should always change the stage
+                            self.handle_message(EditorMessage::ChangeSelectedSymbol(editing_clip));
+                        }
+                        FlitsEditOutput::Properties(editing_clip) => {
+                            self.selection.properties_symbol_index = editing_clip;
+                            self.properties_panel.update(&self.movie, &self.selection);
+                        }
+                        FlitsEditOutput::PlacedSymbols(editing_clip, items) => {
+                            self.handle_message(EditorMessage::ChangeSelectedSymbol(editing_clip));
+                            self.handle_message(EditorMessage::ChangeSelectedPlacedSymbols(items));
+                        }
+                    }
+                }
                 // TODO: lose ui focus (that causes a bunch of edge cases)
             }
             EditorMessage::Edit(edit) => {

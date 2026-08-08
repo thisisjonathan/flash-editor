@@ -3,7 +3,15 @@ use flits_core::{
     PlaceSymbol, PlacedSymbolIndex, Symbol, SymbolIndex, SymbolIndexOrRoot,
 };
 
-use crate::undo::{ActionEdit, ChangeEdit};
+use crate::undo::{ActionEdit, ChangeEdit, EditMessage};
+
+pub enum FlitsEditOutput {
+    Stage(SymbolIndexOrRoot),
+    Properties(SymbolIndexOrRoot),
+    PlacedSymbols(SymbolIndexOrRoot, Vec<PlacedSymbolIndex>),
+}
+
+pub type FlitsEditMessage = EditMessage<MovieChange, MovieAction>;
 
 #[derive(Debug, Clone)]
 pub enum MovieChange {
@@ -15,6 +23,7 @@ pub enum MovieChange {
 }
 impl ChangeEdit for MovieChange {
     type Model = Movie;
+    type Output = FlitsEditOutput;
 
     fn apply(&self, model: &mut Movie) {
         match self {
@@ -94,6 +103,28 @@ impl ChangeEdit for MovieChange {
                 }
                 MovieChange::PlacedSymbols(existing_changes)
             }
+        }
+    }
+
+    fn output(&self) -> FlitsEditOutput {
+        match self {
+            MovieChange::MovieProperties(_) => FlitsEditOutput::Properties(None),
+            MovieChange::BitmapProperties(symbol_index, _) => {
+                FlitsEditOutput::Properties(Some(*symbol_index))
+            }
+            MovieChange::MovieClipProperties(symbol_index, _) => {
+                FlitsEditOutput::Properties(Some(*symbol_index))
+            }
+            MovieChange::FontProperties(symbol_index, _) => {
+                FlitsEditOutput::Properties(Some(*symbol_index))
+            }
+            MovieChange::PlacedSymbols(placed_symbol_changes) => FlitsEditOutput::PlacedSymbols(
+                placed_symbol_changes[0].editing_symbol_index,
+                placed_symbol_changes
+                    .iter()
+                    .map(|psc| psc.placed_symbol_index)
+                    .collect(),
+            ),
         }
     }
 }
@@ -180,6 +211,7 @@ impl MovieAction {
 }
 impl ActionEdit for MovieAction {
     type Model = Movie;
+    type Output = FlitsEditOutput;
 
     fn apply(&self, model: &mut Movie) {
         match self {
@@ -247,6 +279,32 @@ impl ActionEdit for MovieAction {
             }
             MovieAction::AddPlacedSymbols(actions) => MovieAction::RemovePlacedSymbols(actions),
             MovieAction::RemovePlacedSymbols(actions) => MovieAction::AddPlacedSymbols(actions),
+        }
+    }
+
+    fn output(&self) -> FlitsEditOutput {
+        match self {
+            MovieAction::AddSymbol(symbol_index, _, _) => {
+                FlitsEditOutput::Stage(Some(*symbol_index))
+            }
+            MovieAction::RemoveSymbol(_, _, _) => {
+                // the symbol doesn't exist anymore, go to the root
+                FlitsEditOutput::Stage(None)
+            }
+            MovieAction::AddPlacedSymbols(placed_symbol_actions) => FlitsEditOutput::PlacedSymbols(
+                placed_symbol_actions[0].editing_symbol_index,
+                placed_symbol_actions
+                    .iter()
+                    .map(|psa| psa.placed_symbol_index)
+                    .collect(),
+            ),
+            MovieAction::RemovePlacedSymbols(placed_symbol_actions) => {
+                // select nothing because the placed symbols are removed
+                FlitsEditOutput::PlacedSymbols(
+                    placed_symbol_actions[0].editing_symbol_index,
+                    Vec::new(),
+                )
+            }
         }
     }
 }

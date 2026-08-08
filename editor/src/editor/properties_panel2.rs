@@ -5,7 +5,7 @@ use flits_core::{
 
 use crate::{
     editor::Context,
-    edits::{MovieAction, MovieChange, PlacedSymbolChange},
+    edits::{FlitsEditMessage, MovieAction, MovieChange, PlacedSymbolChange},
     message::EditorMessage,
     undo::EditMessage,
 };
@@ -104,7 +104,7 @@ impl PropertiesPanel2 {
         ctx: &Context,
         model: T,
         symbol_index: SymbolIndexOrRoot,
-        edit_message: impl FnOnce(T) -> EditMessage<MovieChange, MovieAction>,
+        edit_message: impl FnOnce(T) -> FlitsEditMessage,
         additional_info: I,
     ) {
         ui.horizontal(|ui| {
